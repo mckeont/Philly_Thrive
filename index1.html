@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Philly Thrive Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map {
+            width: 100%;
+            height: 600px;
+        }
+        #info-box {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            background: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            z-index: 1000;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Info Box -->
+    <div id="info-box">Click a point to see details.</div>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- Load Philly Thrive GeoJSON -->
+    <script src="phillythrive1.js"></script>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([39.9372, -75.1973], 14); // Center on Philly
+
+        // Add a tile layer (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Reference the info box
+        var infoBox = document.getElementById('info-box');
+
+        // Function to create popup content
+        function createInfoContent(feature) {
+            let properties = feature.properties;
+            let content = `<strong>${properties.Name}</strong><br>`;
+            
+            if (properties.Address) content += `<strong>Address:</strong> ${properties.Address}<br>`;
+            if (properties["Category/Layer"]) content += `<strong>Category:</strong> ${properties["Category/Layer"]}<br>`;
+            if (properties["Contributed by"]) content += `<strong>Contributed by:</strong> ${properties["Contributed by"]}<br>`;
+
+if (properties.Audio) {
+    let audioSrc = properties.Audio;
+
+    // Ensure Google Drive uses the streaming-friendly URL
+    if (audioSrc.includes("drive.google.com")) {
+        let fileId = audioSrc.split("id=")[1]; // Extract file ID
+        audioSrc = `https://docs.google.com/uc?export=preview&id=${fileId}`;
+    }
+
+    content += `<strong>Audio:</strong> <audio controls>
+                    <source src="${audioSrc}" type="audio/mpeg" onerror="this.style.display='none'">
+                </audio><br>`;
+}
+
+            if (properties.Video) {
+                content += `<strong>Video:</strong> <a href="${properties.Video}" target="_blank">Watch Video</a><br>`;
+            }
+if (properties.Images && properties.Images.length > 0) {
+    content += `<strong>Images:</strong><br>`;
+    properties.Images.forEach(image => {
+        // Check if the image is a Google Drive link
+        if (image.includes("drive.google.com")) {
+            let fileId = image.split("id=")[1];  // Extract file ID
+            image = `https://drive.google.com/thumbnail?id=${fileId}`;
+        }
+        content += `<img src="${image}" alt="Image" onerror="this.style.display='none'"><br>`;
+    });
+}
+
+
+            return content;
+        }
+
+        // Add GeoJSON points to the map
+        L.geoJSON(phillythrive1, {
+            pointToLayer: function (feature, latlng) {
+                return L.circleMarker(latlng, {
+                    radius: 6,
+                    fillColor: "#0078A8",
+                    color: "#005580",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
+            },
+            onEachFeature: function (feature, layer) {
+                layer.on('click', function () {
+                    infoBox.innerHTML = createInfoContent(feature);
+                });
+            }
+        }).addTo(map);
+    </script>
+
+</body>
+</html>
