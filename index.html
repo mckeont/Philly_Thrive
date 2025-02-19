@@ -229,7 +229,12 @@ html, body {
     <script>
 var map = L.map('map').setView([39.9372, -75.1973], 14);
 
+var esriCommunity = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '&copy; Esri, Community Maps Contributors'
+});
+
 var basemaps = {
+    "Esri Community Maps": esriCommunity,
     "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }),
     "Carto Positron": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB' }),
     "Esri World Imagery": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri' }),
@@ -237,7 +242,7 @@ var basemaps = {
     "Carto Dark Matter": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB' })
 };
 
-basemaps["OpenStreetMap"].addTo(map);
+basemaps["Esri Community Maps"].addTo(map);
 L.control.layers(basemaps).addTo(map);
 
 var layerPanel = document.getElementById('layer-panel');
