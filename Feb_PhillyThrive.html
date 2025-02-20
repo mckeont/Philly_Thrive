@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Philly Thrive Map</title>
+	    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+
+    <style>
+/* Ensure body takes full height */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100vh; /* Full screen */
+    overflow: hidden; /* Prevent scrolling */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Fullscreen Map */
+#map {
+    width: 100%;
+    height: 100vh;
+}
+
+#bottom-panel {
+    display: flex;
+    justify-content: space-between;
+    width: 95%;  /* Reduce width slightly to avoid overlapping controls */
+    min-height: 80px; /* Reduce size slightly */
+    max-height: 18vh;
+    padding: 10px;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.9);
+    transition: opacity 0.3s ease-in-out;
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+}
+
+
+/* Make it visible when toggled */
+#bottom-panel.visible {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+
+/* Toggle Button - Always Visible */
+#toggle-panel {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 5px;
+    z-index: 1000;
+}
+
+#toggle-panel:hover {
+    background: rgba(0, 0, 0, 1);
+}
+
+#layer-panel {
+    position: absolute;
+    bottom: 400px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    font-size: 14px;
+    max-width: 250px;
+    overflow-y: auto;
+    max-height: 250px;
+    z-index: 1000; /* Ensures it stays above other elements */
+}
+
+
+/* Keep Layers Open by Default on Desktop */
+#layer-content {
+    display: block;
+}
+
+/* Hide Layers on Mobile, Show on Click */
+@media (max-width: 900px) {
+    #layer-content {
+        display: none;
+    }
+
+    #layer-panel button {
+        display: block;
+    }
+}
+
+/* Layer Toggle Button */
+#layer-panel button {
+    background: #333;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    width: 100%;
+}
+
+#layer-panel button:hover {
+    background: #555;
+}
+
+
+/* Hide panel when user interacts with the map */
+#map:hover + #bottom-panel {
+    opacity: 1;
+    pointer-events: all;
+}
+
+
+/* Info panel takes ~75% width */
+#info-panel {
+    flex: 3;
+	top: 40px;
+	right: 30px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+    font-size: 14px;
+    text-align: left;
+    max-width: 75%;
+    overflow-y: auto; /* Prevents excessive height growth */
+    max-height: 100%; /* Ensures it doesn't overflow */
+}
+
+/* Ensure Layer Panel is visible and above the map */
+#layer-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+    z-index: 1001; /* Ensure it's above the map */
+}
+
+/* Ensure the layer toggle button is visible */
+#layer-panel button {
+    background: #333;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    width: 100%;
+}
+
+#layer-panel button:hover {
+    background: #555;
+}
+
+/* Ensure the layer content (checkboxes) is properly displayed */
+#layer-content {
+    display: block; /* Always visible */
+    padding-top: 5px;
+}
+
+/* Improve visibility on small screens */
+@media (max-width: 900px) {
+    #layer-panel {
+        width: auto;
+        right: 5px;
+    }
+
+    #layer-content {
+        display: block;
+    }
+}
+
+
+
+/* Floating Info Panel */
+#info-panel {
+    position: absolute;
+    top: 50px; /* Adjust this if needed */
+    left: 10px; /* Position at top-left, can be changed */
+    width: 250px;
+    background: rgba(255, 255, 255, 0.95);
+    font-size: 12px;
+    padding: 10px;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    z-index: 1000;
+    display: none; /* Hidden by default */
+    transition: all 0.3s ease-in-out;
+}
+
+/* Make panel visible */
+#info-panel.visible {
+    display: block;
+}
+
+/* Close button for floating panel */
+#close-info {
+    background: red;
+    color: white;
+    border: none;
+    padding: 5px;
+    cursor: pointer;
+    border-radius: 5px;
+    float: right;
+}
+
+/* Toggle Button (keeps it separate) */
+#toggle-info {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 5px;
+    z-index: 1000;
+}
+
+#toggle-info:hover {
+    background: rgba(0, 0, 0, 1);
+}
+
+
+
+        .layer-category { font-weight: bold; cursor: pointer; }
+/* Lightbox overlay (darker background) */
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7); /* Dark background */
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+/* Large popup container */
+.popup-content {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 80%; /* Takes up most of the screen */
+    max-width: 800px; /* Caps size */
+    max-height: 90vh; /* Limits height */
+    overflow-y: auto; /* Enables scrolling */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    text-align: left;
+    position: relative;
+}
+
+/* Close button */
+.popup-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    color: red;
+    cursor: pointer;
+}
+
+/* Ensures images are well formatted inside */
+.popup-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 5px;
+    margin-top: 8px;
+}
+
+.popup-content h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+.popup-content p {
+    margin: 5px 0;
+}
+.popup-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 5px;
+    margin-top: 8px;
+}
+
+
+.carousel-container {
+    position: relative;
+    width: 80%; /* Adjust width slightly smaller */
+    max-width: 500px; /* Prevent large scaling */
+    margin: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+}
+
+.carousel-slide {
+    display: none;
+    width: 100%; /* Keep full width inside container */
+    max-height: 300px; /* Reduce height */
+    object-fit: contain; /* Prevents cropping */
+    border-radius: 8px; /* Slight rounding for smoother look */
+    box-shadow: 0px 4px 10px rgba(0,0,0,0.2); /* Softer shadow for depth */
+}
+
+.carousel-slide.active {
+    display: block;
+}
+
+/* Slightly reduced and repositioned arrows */
+.prev, .next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    font-size: 20px; /* Slightly smaller */
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.prev { left: 10px; }  /* Keep close but not cramped */
+.next { right: 10px; }
+
+        .popup-close { cursor: pointer; font-size: 18px; font-weight: bold; color: red; }
+        img { max-width: 100%; height: auto; margin-top: 5px; }
+		
+		.legend {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 8px;
+    font-size: 14px;
+    border-radius: 6px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.legend i {
+    width: 18px;
+    height: 18px;
+    display: inline-block;
+    margin-right: 5px;
+    border-radius: 50%;
+}
+
+.image-counter {
+    text-align: center;
+    font-size: 14px;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+.fullscreen-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.fullscreen-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+<!-- Toggle Info Button -->
+<button id="toggle-info" onclick="toggleInfoPanel()">Show Info</button>
+
+<!-- Floating Info Panel -->
+<div id="info-panel">
+    <button id="close-info" onclick="closeInfoPanel()">×</button>
+    <strong>Welcome to the Grays Ferry EJ Walking Tour</strong><br><br>
+    <p>
+        🗺️ <strong>Explore the Map:</strong> Click on a point to learn about its history and environmental impact.<br>
+        📍 <strong>Walking Tour Guide:</strong> This map highlights key locations in the environmental justice history of Grays Ferry.<br>
+        🎛️ <strong>Map Controls:</strong> Press <kbd>Esc</kbd> to close popups. Use <kbd>←</kbd> <kbd>→</kbd> to scroll through images.
+    </p>
+</div>
+
+
+<div id="layer-panel">
+    <button onclick="toggleLayerPanel()">Layers</button>
+    <div id="layer-content">
+        <label><input type="checkbox" checked> Public Space/Parks</label><br>
+        <label><input type="checkbox" checked> Housing</label><br>
+        <label><input type="checkbox" checked> Former Businesses</label><br>
+        <label><input type="checkbox" checked> Schools</label><br>
+        <label><input type="checkbox" checked> Environmental Impacts</label><br>
+    </div>
+</div>
+
+</div>
+<div id="popup" class="popup-overlay">
+    <div class="popup-content">
+        <span class="popup-close" onclick="closePopup()">&times;</span>
+        <div id="popup-info"></div>
+    </div>
+</div>
+
+
+    <script src="phillythrive1.js"></script>
+    <script>
+var map = L.map('map').setView([39.9372, -75.1973], 14);
+
+var esriCommunity = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '&copy; Esri, Community Maps Contributors'
+});
+
+var basemaps = {
+    "Esri Community Maps": esriCommunity,
+    "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }),
+    "Carto Positron": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB' }),
+    "Esri World Imagery": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri' }),
+    "Esri Topographic": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri' }),
+    "Carto Dark Matter": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB' })
+};
+
+basemaps["Esri Community Maps"].addTo(map);
+L.control.layers(basemaps, null, { position: "bottomleft" }).addTo(map);
+
+
+var legend = L.control({ position: "bottomright" });
+
+
+legend.onAdd = function () {
+    var div = L.DomUtil.create("div", "legend");
+    div.innerHTML += "<strong>Legend</strong><br>";
+    div.innerHTML += '<i style="background: #4CAF50"></i> Public Space/Parks<br>';
+    div.innerHTML += '<i style="background: #FF9800"></i> Housing<br>';
+    div.innerHTML += '<i style="background: #9C27B0"></i> Former Businesses<br>';
+    div.innerHTML += '<i style="background: #2196F3"></i> Schools<br>';
+    div.innerHTML += '<i style="background: #D32F2F"></i> Environmental Impacts<br>';
+    return div;
+};
+legend.addTo(map);
+
+
+var layerPanel = document.getElementById('layer-panel');
+var popup = document.getElementById('popup');
+var popupInfo = document.getElementById('popup-info');
+
+// Function to convert Google Drive links into direct URLs
+function getGoogleDriveDirectLink(url) {
+    if (!url) return ''; // Handle missing URLs gracefully
+    let fileId;
+
+    // Check for two common Google Drive URL formats
+    if (url.includes("id=")) {
+        fileId = url.split("id=")[1].split("&")[0]; 
+    } else if (url.includes("/file/d/")) {
+        fileId = url.split("/file/d/")[1].split("/")[0]; 
+    }
+
+    return fileId ? `https://drive.google.com/uc?export=view&id=${fileId}` : url;
+}
+
+
+function createPopupContent(feature) {
+    let props = feature.properties;
+    let content = `<h2>${props.Name}</h2>`;
+
+    if (props.Address) {
+        content += `<p><strong>Address:</strong> ${props.Address}</p>`;
+    }
+
+    // 🎵 Audio Handling
+    if (props.Audio) {
+        let audioSrc = props.Audio.trim();
+
+        // Ensure Google Drive audio links work
+        if (audioSrc.includes("drive.google.com")) {
+            let match = audioSrc.match(/\/d\/([a-zA-Z0-9_-]+)/) || audioSrc.match(/id=([a-zA-Z0-9_-]+)/);
+            if (match) {
+                let fileId = match[1];
+                audioSrc = `https://docs.google.com/uc?export=preview&id=${fileId}`;
+            }
+        }
+
+        content += `<p><strong>Audio:</strong></p>
+                    <audio controls onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+                        <source src="${audioSrc}" type="audio/mpeg">
+                    </audio>
+                    <p style="display: none; color: red;">⚠ Audio file failed to load.</p>`;
+    }
+
+    // 🖼️ Image Carousel Handling
+   if (props.Images && props.Images.length > 0) {
+    let totalImages = props.Images.length;
+    content += `<div class="carousel-container">
+                    <p class="image-counter">Image 1 of ${totalImages}</p>
+                    <button class="fullscreen-btn" onclick="viewFullscreen()">🔍</button>`;
+    
+    props.Images.forEach((image, index) => {
+        let imgSrc = image.trim();
+
+        // Ensure Google Drive images are properly formatted
+        if (imgSrc.includes("drive.google.com")) {
+            let match = imgSrc.match(/\/d\/([a-zA-Z0-9_-]+)/) || imgSrc.match(/id=([a-zA-Z0-9_-]+)/);
+            if (match) {
+                let fileId = match[1];
+                imgSrc = `https://drive.google.com/thumbnail?id=${fileId}`;
+            }
+        }
+
+        content += `<img class="carousel-slide ${index === 0 ? 'active' : ''}" 
+                        src="${imgSrc}" 
+                        alt="Image ${index + 1}"
+                        onclick="viewFullscreen(this)"
+                        onerror="this.style.display='none'; console.error('Image failed:', this.src);">`;
+    });
+
+    content += `
+        <button class="prev" onclick="changeSlide(-1)">&#10094;</button>
+        <button class="next" onclick="changeSlide(1)">&#10095;</button>
+    </div>`;
+}
+
+
+    return content;
+}
+
+// Function to open the popup
+function openPopup(content) {
+    popupInfo.innerHTML = content;
+    popup.style.display = "flex";
+}
+
+// Function to close the popup
+function closePopup() {
+    // Find all audio elements inside the popup
+    let audios = popupInfo.querySelectorAll("audio");
+
+    // Pause and reset each audio element
+    audios.forEach(audio => {
+        audio.pause();  // Stop playback
+        audio.currentTime = 0; // Reset to start
+    });
+
+    // Hide the popup
+    popup.style.display = "none";
+}
+
+
+// Close popup with Esc key
+document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape") {
+        closePopup();
+    }
+});
+
+function changeSlide(n) {
+    let slides = document.querySelectorAll(".carousel-slide");
+    if (slides.length === 0) return;
+
+    let activeIndex = Array.from(slides).findIndex(slide => slide.classList.contains("active"));
+    let newIndex = (activeIndex + n + slides.length) % slides.length;
+
+    slides.forEach((slide, i) => {
+        slide.classList.toggle("active", i === newIndex);
+    });
+
+    // Update image counter
+    let counter = document.querySelector(".image-counter");
+    if (counter) {
+        counter.textContent = `Image ${newIndex + 1} of ${slides.length}`;
+    }
+}
+
+function toggleInfoPanel() {
+    var panel = document.getElementById("info-panel");
+    var button = document.getElementById("toggle-info");
+
+    if (panel.style.display === "none" || panel.style.display === "") {
+        panel.style.display = "block";
+        button.innerText = "Hide Info";
+    } else {
+        panel.style.display = "none";
+        button.innerText = "Show Info";
+    }
+}
+
+// Close button function
+function closeInfoPanel() {
+    document.getElementById("info-panel").style.display = "none";
+    document.getElementById("toggle-info").innerText = "Show Info";
+}
+
+
+// Function to toggle layer panel (for mobile)
+function toggleLayerPanel() {
+    var panel = document.getElementById("layer-content");
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+}
+
+
+// Function to toggle layer visibility
+function toggleLayer(category) {
+    if (!categories[category]) return;
+
+    let isVisible = map.hasLayer(categories[category]);
+    isVisible ? map.removeLayer(categories[category]) : categories[category].addTo(map);
+}
+
+
+// Create layers dynamically
+var categories = {};
+L.geoJSON(phillythrive1, {
+pointToLayer: function (feature, latlng) {
+    let category = feature.properties["Category/Layer"] || "Other";
+    let colorMap = {
+        "Public Space/Parks": "#4CAF50",
+        "Housing": "#FF9800",
+        "Former Businesses": "#9C27B0",
+        "Schools": "#2196F3",
+        "Environmental Impacts": "#D32F2F",
+        "Other": "#757575"
+    };
+
+    return L.circleMarker(latlng, {
+        radius: 10, // Reduce size slightly for clarity
+        fillColor: colorMap[category] || "#0078A8",
+        color: "#fff",
+        weight: 1.5,
+        opacity: 0.9,
+        fillOpacity: 0.85
+    });
+}
+,
+    onEachFeature: function (feature, layer) {
+        let category = (feature.properties["Category/Layer"] || "Other").trim();
+
+        if (!categories[category]) {
+            categories[category] = L.layerGroup().addTo(map);
+
+            if (!document.querySelector(`#layer-panel input[value='${category}']`)) {
+                let catDiv = document.createElement("div");
+                catDiv.innerHTML = `
+                    <label>
+                        <input type="checkbox" checked value="${category}" onchange="toggleLayer('${category}')"> 
+                        <span class="layer-category">${category}</span>
+                    </label>`;
+                layerPanel.appendChild(catDiv);
+            }
+        }
+
+        layer.on('click', function () {
+            let content = createPopupContent(feature);
+            openPopup(content);
+        });
+
+        categories[category].addLayer(layer);
+    }
+});
+
+function viewFullscreen(img) {
+    let newWindow = window.open("", "_blank");
+    newWindow.document.write(`<img src="${img.src}" style="width:100%">`);
+}
+
+function toggleBottomPanel() {
+    var panel = document.getElementById("bottom-panel");
+    var button = document.getElementById("toggle-panel");
+
+    if (panel.classList.contains("visible")) {
+        panel.classList.remove("visible");
+        button.innerText = "Show Info";
+    } else {
+        panel.classList.add("visible");
+        button.innerText = "Hide Info";
+    }
+}
+
+
+
+    </script>
+</body>
+</html>
